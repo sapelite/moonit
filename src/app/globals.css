@@ -1,11 +1,52 @@
 @import "tailwindcss";
 
+/* Flash animations for AlphaTerminal */
+@keyframes flash-green {
+  0% { background-color: rgba(34, 197, 94, 0.2); }
+  100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+  0% { background-color: rgba(239, 68, 68, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.flash-green {
+  animation: flash-green 0.5s ease-out;
+}
+
+.flash-red {
+  animation: flash-red 0.5s ease-out;
+}
+
+/* Marquee animation for AlphaTerminal */
+@keyframes marquee {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar { 
+  display: none; 
+}
+.scrollbar-hide { 
+  -ms-overflow-style: none; 
+  scrollbar-width: none; 
+}
+
 :root {
   --background: #0a0a0a;
   --foreground: #e2e8f0;
   --solana-green: #14f195;
   --amber: #f59e0b;
   --terminal-bg: #0d1117;
+}
+
+html, body {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 @theme inline {
@@ -25,7 +66,9 @@ body {
   background: #0a0a0a;
   color: var(--foreground);
   font-family: var(--font-space-mono), monospace;
-  overflow: hidden;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Custom scrollbar */

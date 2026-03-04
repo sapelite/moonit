@@ -1,13 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import SurveillanceSystem from "./SurveillanceSystem";
+import AlphaTerminal from "./AlphaTerminal";
 
 export default function MonitorDisplay() {
   return (
-    <div className="min-h-screen bg-black flex flex-col">
+    <div className="min-h-screen bg-black flex flex-col overflow-y-auto w-full">
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-zinc-900">
+      <nav className="flex items-center justify-between px-6 py-4 border-b border-zinc-900 sticky top-0 z-50 bg-black w-full">
         {/* Logo */}
         <div className="flex items-center gap-3">
           <span className="text-xl font-bold tracking-tight">
@@ -37,20 +37,20 @@ export default function MonitorDisplay() {
         </div>
       </nav>
 
-      {/* Hero - Surveillance System */}
-      <main className="flex-1 flex items-center justify-center p-6">
+      {/* Main Content - Alpha Terminal */}
+      <main className="flex-1 p-0">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-[1200px]"
+          className="w-full h-full"
         >
-          <SurveillanceSystem />
+          <AlphaTerminal />
         </motion.div>
       </main>
 
       {/* Footer */}
-      <footer className="flex items-center justify-between px-6 py-4 border-t border-zinc-900">
+      <footer className="flex items-center justify-between px-6 py-4 border-t border-zinc-900 w-full">
         <span className="text-xs text-zinc-600 font-mono">
           © 2025 monitor.memes
         </span>
