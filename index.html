@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>monitor.memes</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            bg: '#04070b',
+            panel: '#0a0f14',
+            cyan: '#1de9ff',
+            cyan2: '#00c8ff',
+            green: '#12f7a1',
+            orange: '#ff9b2f',
+            redx: '#ff5e66',
+            purplex: '#8b7dff',
+            criticalx: '#ff00a8'
+          },
+          boxShadow: {
+            card: '0 0 0 1px rgba(255,255,255,.04), 0 10px 28px rgba(0,0,0,.26)'
+          },
+          keyframes: {
+            ticker: {
+              '0%': { transform: 'translateX(0)' },
+              '100%': { transform: 'translateX(-50%)' }
+            },
+            spin: {
+              'to': { transform: 'rotate(360deg)' }
+            }
+          },
+          animation: {
+            ticker: 'ticker 28s linear infinite',
+            spin: 'spin .8s linear infinite'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html, body {
+      height: 100%;
+      background: #020406;
+    }
+
+    body {
+      background-image:
+        radial-gradient(circle at top left, rgba(0, 200, 255, .06), transparent 22%),
+        radial-gradient(circle at top right, rgba(18, 247, 161, .04), transparent 24%),
+        linear-gradient(180deg, rgba(255,255,255,.015), transparent 24%);
+    }
+
+    .panel-edge {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel-edge::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(29,233,255,.11), transparent 15%, transparent 85%, rgba(18,247,161,.08)),
+        linear-gradient(180deg, rgba(255,255,255,.02), transparent);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      padding: 1px;
+      mask-composite: exclude;
+      -webkit-mask-composite: xor;
+    }
+
+    .scanlines::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.025) 0px,
+        rgba(255,255,255,0.0) 2px,
+        rgba(255,255,255,0.0) 4px
+      );
+      background-size: 100% 6px;
+      opacity: .05;
+      mix-blend-mode: screen;
+    }
+
+    .scroll-thin::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    .scroll-thin::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,.10);
+      border-radius: 999px;
+    }
+
+    .scroll-thin::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #macroLeafletMap {
+      width: 100%;
+      height: 100%;
+      min-height: 460px;
+      background: #05080d;
+      border-radius: 8px;
+    }
+
+    .leaflet-container {
+      background: #05080d !important;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .leaflet-control-zoom a {
+      background: rgba(6,10,14,.96) !important;
+      color: #e8faff !important;
+      border-bottom: 1px solid rgba(255,255,255,.06) !important;
+      box-shadow: 0 0 12px rgba(0,0,0,.25);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: rgba(10,16,22,.98) !important;
+      color: #00e5ff !important;
+    }
+
+    .leaflet-tooltip.macro-tooltip {
+      background: rgba(4,7,11,.94);
+      color: rgba(255,255,255,.88);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      box-shadow: none;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 5px 8px;
+    }
+
+    .leaflet-tooltip.macro-tooltip::before {
+      border-top-color: rgba(4,7,11,.94);
+    }
+
+    .custom-popup .leaflet-popup-content-wrapper {
+      background: #0a0f14;
+      color: rgba(255,255,255,.9);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      box-shadow: 0 10px 28px rgba(0,0,0,.55);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .custom-popup .leaflet-popup-tip {
+      background: #0a0f14;
+    }
+
+    .custom-popup .leaflet-popup-close-button {
+      color: rgba(255,255,255,.5) !important;
+    }
+
+    #macroLoader,
+    #marketLoader,
+    #marketChartLoader {
+      position: absolute;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5,8,13,.85);
+      backdrop-filter: blur(4px);
+      border-radius: 8px;
+      gap: 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,.6);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .loader-ring {
+      width: 28px;
+      height: 28px;
+      border: 2px solid rgba(29,233,255,.15);
+      border-top-color: #1de9ff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    #macroLegend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      z-index: 500;
+      background: rgba(4,7,11,.88);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      backdrop-filter: blur(6px);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: rgba(255,255,255,.7);
+    }
+
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,.5);
+      flex-shrink: 0;
+    }
+
+    #macroBadge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 500;
+      background: rgba(4,7,11,.88);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 9px;
+      color: rgba(255,255,255,.6);
+      font-family: 'JetBrains Mono', monospace;
+      backdrop-filter: blur(6px);
+    }
+
+    .feed-tag {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.03);
+      color: rgba(255,255,255,.65);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 10px;
+      line-height: 1;
+      transition: .18s ease;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+
+    .feed-tag:hover {
+      border-color: rgba(29,233,255,.35);
+      color: rgba(255,255,255,.92);
+      background: rgba(29,233,255,.08);
+    }
+
+    .feed-tag.active {
+      border-color: rgba(29,233,255,.65);
+      color: #041018;
+      background: linear-gradient(180deg, #3ff3ff 0%, #00c8ff 100%);
+      box-shadow: 0 0 16px rgba(29,233,255,.25);
+      font-weight: 700;
+    }
+
+    .refresh-pill {
+      border: 1px solid rgba(29,233,255,.18);
+      background: rgba(29,233,255,.08);
+      color: rgba(224,250,255,.88);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 10px;
+      line-height: 1;
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+    }
+
+    .test-btn {
+      border: 1px solid rgba(18,247,161,.20);
+      background: rgba(18,247,161,.08);
+      color: rgba(220,255,244,.92);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 10px;
+      line-height: 1;
+      font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap;
+      transition: .18s ease;
+      cursor: pointer;
+    }
+
+    .test-btn:hover {
+      background: rgba(18,247,161,.16);
+      border-color: rgba(18,247,161,.38);
+      color: #ffffff;
+    }
+
+    .test-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .feed-update-badge {
+      font-size: 9px;
+      color: rgba(18,247,161,.9);
+      opacity: 0;
+      transform: translateY(-2px);
+      transition: .25s ease;
+      white-space: nowrap;
+    }
+
+    .feed-update-badge.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .feed-update-flash {
+      animation: feedFlash .9s ease;
+    }
+
+    .map-update-flash,
+    .market-update-flash {
+      animation: mapFlash 1.1s ease;
+    }
+
+    .event-enter {
+      animation: eventEnter .45s ease;
+    }
+
+    #marketChart {
+      position: absolute;
+      inset: 0;
+    }
+
+    #marketChartShell {
+      background:
+        radial-gradient(circle at 20% 20%, rgba(29,233,255,.08), transparent 30%),
+        radial-gradient(circle at 80% 80%, rgba(18,247,161,.06), transparent 28%),
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    }
+
+    .chart-badge {
+      position: absolute;
+      z-index: 15;
+      left: 10px;
+      top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      pointer-events: none;
+    }
+
+    .chart-pill {
+      width: fit-content;
+      max-width: 100%;
+      background: rgba(4,7,11,.86);
+      border: 1px solid rgba(255,255,255,.08);
+      color: rgba(255,255,255,.78);
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 9px;
+      line-height: 1.2;
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chart-status {
+      position: absolute;
+      z-index: 15;
+      right: 10px;
+      top: 10px;
+      background: rgba(4,7,11,.86);
+      border: 1px solid rgba(255,255,255,.08);
+      color: rgba(255,255,255,.55);
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 9px;
+      line-height: 1.2;
+      backdrop-filter: blur(6px);
+    }
+
+    .compact-card {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,.06);
+      background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.01));
+      border-radius: 10px;
+      padding: 9px 10px;
+      transition: .18s ease;
+      text-align: left;
+    }
+
+    .compact-card:hover {
+      border-color: rgba(29,233,255,.25);
+      background: linear-gradient(180deg, rgba(29,233,255,.05), rgba(255,255,255,.02));
+    }
+
+    .compact-card.active {
+      border-color: rgba(29,233,255,.55);
+      background: linear-gradient(180deg, rgba(29,233,255,.08), rgba(255,255,255,.02));
+      box-shadow: 0 0 0 1px rgba(29,233,255,.18), 0 0 24px rgba(29,233,255,.08);
+    }
+
+    .compact-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 7px;
+    }
+
+    .compact-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .compact-logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      object-fit: cover;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+      flex-shrink: 0;
+    }
+
+    .compact-title {
+      font-size: 11px;
+      color: rgba(255,255,255,.95);
+      font-weight: 600;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .compact-subtitle {
+      font-size: 9px;
+      color: rgba(255,255,255,.35);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .compact-price {
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .compact-price-value {
+      font-size: 11px;
+      color: #fff;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+
+    .compact-price-change {
+      font-size: 9px;
+      line-height: 1.1;
+    }
+
+    .compact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 10px;
+    }
+
+    .compact-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 9px;
+      color: rgba(255,255,255,.7);
+    }
+
+    .compact-address {
+      margin-top: 6px;
+      font-size: 9px;
+      color: rgba(255,255,255,.32);
+    }
+
+    .up {
+      color: #12f7a1;
+    }
+
+    .down {
+      color: #ff5e66;
+    }
+
+    @keyframes mapFlash {
+      0% {
+        box-shadow: inset 0 0 0 1px rgba(29,233,255,.12), 0 0 0 rgba(29,233,255,0);
+        transform: scale(1);
+      }
+      35% {
+        box-shadow: inset 0 0 0 1px rgba(29,233,255,.35), 0 0 30px rgba(29,233,255,.18);
+        transform: scale(1.003);
+      }
+      100% {
+        box-shadow: inset 0 0 0 1px rgba(29,233,255,.12), 0 0 0 rgba(29,233,255,0);
+        transform: scale(1);
+      }
+    }
+
+    @keyframes feedFlash {
+      0% { background: rgba(29,233,255,.00); }
+      35% { background: rgba(29,233,255,.06); }
+      100% { background: rgba(29,233,255,.00); }
+    }
+
+    @keyframes eventEnter {
+      0% { opacity: 0; transform: translateY(6px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="font-mono text-white">
+  <div class="min-h-screen p-2">
+    <div class="mx-auto w-full max-w-[1440px] rounded-2xl border border-white/5 bg-black/60 backdrop-blur-sm shadow-[0_18px_60px_rgba(0,0,0,.55)] overflow-hidden">
+
+      <header class="px-3 sm:px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+        <div class="text-[15px] sm:text-[18px] md:text-[20px] font-semibold tracking-tight leading-none">
+          <span class="text-green">monitor</span><span class="text-white">.</span><span class="text-white/85">memes</span>
+        </div>
+        <div class="hidden md:flex items-center gap-4 text-[11px] text-white/45">
+          <span>@monitormemes</span>
+        </div>
+      </header>
+
+      <main class="p-2.5 sm:p-3 space-y-2.5">
+        <section class="grid grid-cols-1 xl:grid-cols-12 gap-2.5 xl:h-[560px]">
+          <div class="xl:col-span-8 rounded-xl border border-white/5 bg-panel shadow-card panel-edge scanlines min-h-[360px] xl:min-h-0">
+            <div class="px-3 py-2.5 border-b border-white/5 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-cyan text-xs">◉</span>
+                <h2 class="uppercase tracking-[0.12em] text-white/75 text-[10px] sm:text-[11px] font-semibold">
+                  Global Macro Intelligence
+                </h2>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <div id="refreshCountdown" class="refresh-pill">Update in 02:00</div>
+              </div>
+            </div>
+
+            <div class="p-2.5 sm:p-3 h-[calc(100%-41px)]">
+              <div id="macroMapShell" class="relative rounded-lg border border-white/5 overflow-hidden h-full min-h-[460px]">
+                <div id="macroLoader">
+                  <div class="loader-ring"></div>
+                  <span>LOADING EVENTS…</span>
+                </div>
+
+                <div id="macroLeafletMap"></div>
+                <div id="macroBadge">— events</div>
+
+                <div id="macroLegend">
+                  <div class="legend-item"><span class="legend-dot" style="background:#ff00a8"></span><span>CRITICAL</span></div>
+                  <div class="legend-item"><span class="legend-dot" style="background:#ff6b00"></span><span>HIGH</span></div>
+                  <div class="legend-item"><span class="legend-dot" style="background:#ffd000"></span><span>MEDIUM</span></div>
+                  <div class="legend-item"><span class="legend-dot" style="background:#00e5ff"></span><span>LOW</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="xl:col-span-4 rounded-xl border border-white/5 bg-panel shadow-card panel-edge scanlines min-h-[260px] xl:min-h-0">
+            <div class="px-3 py-2.5 border-b border-white/5 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-white/60 text-xs">◫</span>
+                <h2 class="uppercase tracking-[0.12em] text-white/75 text-[10px] sm:text-[11px] font-semibold">
+                  Events Feed
+                </h2>
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <div id="feedUpdateBadge" class="feed-update-badge">updated</div>
+                <div id="kolFeedCount" class="text-[9px] text-white/35 whitespace-nowrap">0 events</div>
+              </div>
+            </div>
+
+            <div class="p-2.5 sm:p-3 h-[calc(100%-41px)] flex flex-col gap-2 overflow-hidden">
+              <div class="flex flex-col gap-2">
+                <div>
+                  <div class="block text-[9px] uppercase tracking-[0.08em] text-white/35 mb-1">Categories</div>
+                  <div class="relative">
+                    <div id="kolCategoryTagsWrap" class="overflow-x-auto scroll-thin">
+                      <div id="kolCategoryTags" class="flex flex-nowrap gap-1.5 min-w-max pb-1"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[9px] uppercase tracking-[0.08em] text-white/35 mb-1">Sort</label>
+                  <select
+                    id="kolSortFilter"
+                    class="w-full rounded-lg border border-white/8 bg-black/40 px-2.5 py-2 text-[10px] text-white outline-none focus:border-cyan"
+                  >
+                    <option value="newest">Plus récents</option>
+                    <option value="oldest">Plus anciens</option>
+                    <option value="priority_desc">Priorité haute → basse</option>
+                    <option value="priority_asc">Priorité basse → haute</option>
+                    <option value="category_asc">Catégorie A → Z</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="kolFeedList" class="flex-1 overflow-y-auto scroll-thin space-y-2 pr-1"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 xl:grid-cols-12 gap-2.5 xl:h-[430px]">
+          <div class="xl:col-span-8 rounded-xl border border-white/5 bg-panel shadow-card panel-edge scanlines min-h-[280px] xl:min-h-0">
+            <div class="px-3 py-2.5 border-b border-white/5 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <span class="text-orange text-xs">◔</span>
+                <h2 class="uppercase tracking-[0.12em] text-white/75 text-[10px] sm:text-[11px] font-semibold">
+                  Market Chart
+                </h2>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button id="marketTabTrending" class="feed-tag active" type="button">Meme Trending</button>
+                <button id="marketTabXstocks" class="feed-tag" type="button">xStock</button>
+                <div id="marketRefreshCountdown" class="refresh-pill">Refresh in 00:30</div>
+              </div>
+            </div>
+
+            <div class="p-2.5 sm:p-3 h-[calc(100%-41px)]">
+              <div id="marketChartShell" class="relative rounded-lg border border-white/5 overflow-hidden h-full min-h-[280px]">
+                <div class="chart-badge">
+                  <div id="marketChartTitle" class="chart-pill">Meme Trending</div>
+                  <div id="marketChartSubtitle" class="chart-pill">No asset selected</div>
+                </div>
+
+                <div id="marketChartStatus" class="chart-status">1m • 1000 candles</div>
+
+                <div id="marketChart"></div>
+
+                <div id="marketChartLoader">
+                  <div class="loader-ring"></div>
+                  <span id="marketChartLoaderLabel">LOADING CHART…</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="xl:col-span-4 rounded-xl border border-white/5 bg-panel shadow-card panel-edge scanlines min-h-[280px] xl:min-h-0">
+            <div class="px-3 py-2.5 border-b border-white/5 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-white/60 text-xs">◫</span>
+                <h2 class="uppercase tracking-[0.12em] text-white/75 text-[10px] sm:text-[11px] font-semibold">
+                  Market Feed
+                </h2>
+              </div>
+
+              <div id="marketMeta" class="text-[9px] text-white/35 whitespace-nowrap">loading…</div>
+            </div>
+
+            <div class="p-2.5 sm:p-3 h-[calc(100%-41px)]">
+              <div id="marketShell" class="relative rounded-lg border border-white/5 overflow-hidden h-full min-h-[280px]">
+                <div id="marketLoader">
+                  <div class="loader-ring"></div>
+                  <span id="marketLoaderLabel">LOADING MEME TRENDING…</span>
+                </div>
+
+                <div id="marketGrid" class="h-full overflow-y-auto scroll-thin p-2 space-y-2"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <footer class="px-1 pt-0.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-[9px] text-white/35">
+          <div>© 2026 monitor.memes</div>
+          <div>Meme Trending + xStock in one terminal.</div>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <script>
+  const SUPABASE_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hd3N6ZnZ3Z3B6cHJldWJscWFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4OTQwNjIsImV4cCI6MjA4MzQ3MDA2Mn0.1gMvzfB1ZnUxti6CyWmBav9DX6vlVKuGZ9DjWOZn3eo';
+    const MOBULA_API_KEY = '886fb20c-17ea-42ea-b09a-9cde244cdf00';
+
+
+    const BASE_URL = 'https://oawszfvwgpzpreublqag.supabase.co/rest/v1/global_events';
+    const PAGE_LIMIT = 1000;
+    const REFRESH_INTERVAL_MS = 120000;
+    const MARKET_REFRESH_INTERVAL_MS = 30000;
+
+    const MOBULA_TOKEN_DETAILS_URL = 'https://api.mobula.io/api/2/token/details';
+    const MOBULA_PULSE_URL = 'https://pulse-v2-api.mobula.io/api/2/pulse';
+    const MOBULA_HISTORY_PAIR_URL = 'https://pulse-v2-api.mobula.io/api/1/market/history/pair';
+
+    const STOCK_TOKENS = [
+      { label: 'Apple', symbol: 'AAPL', address: 'XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp' },
+      { label: 'Nvidia', symbol: 'NVDA', address: 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh' },
+      { label: 'Google', symbol: 'GOOGL', address: 'XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN' },
+      { label: 'Meta', symbol: 'META', address: 'Xsa62P5mvPszXL1krVUnU5ar38bBSVcWAB6fmPCo5Zu' },
+      { label: 'Netflix', symbol: 'NFLX', address: 'XsEH7wWfJJu2ZT3UCFeVfALnVA6CP5ur7Ee11KmzVpL' },
+      { label: 'Amazon', symbol: 'AMZN', address: 'Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg' }
+    ];
+
+    const BASE_PARAMS = new URLSearchParams({
+      select: '*',
+      source_type: 'not.in.("narco","instant_events","usa_news","state_fraud","military_intel","geopolitics")',
+      coordinates: 'not.is.null',
+      priority: 'in.(critical,high,medium,low)',
+      published_at: 'gte.2026-01-05T03:45:53.671Z',
+      order: 'published_at.desc'
+    });
+
+    const PRIORITY_CONFIG = {
+      critical: { color: '#ff00a8', radius: 12, label: 'CRITICAL', rank: 4 },
+      high:     { color: '#ff6b00', radius: 9,  label: 'HIGH ALERT', rank: 3 },
+      medium:   { color: '#ffd000', radius: 7,  label: 'ELEVATED', rank: 2 },
+      low:      { color: '#00e5ff', radius: 6,  label: 'WATCH', rank: 1 },
+      default:  { color: '#12f7a1', radius: 5,  label: 'INFO', rank: 0 }
+    };
+
+    const loaderEl = document.getElementById('macroLoader');
+    const badgeEl = document.getElementById('macroBadge');
+    const kolFeedListEl = document.getElementById('kolFeedList');
+    const kolFeedCountEl = document.getElementById('kolFeedCount');
+    const kolCategoryTagsEl = document.getElementById('kolCategoryTags');
+    const kolSortFilterEl = document.getElementById('kolSortFilter');
+    const refreshCountdownEl = document.getElementById('refreshCountdown');
+    const macroMapShellEl = document.getElementById('macroMapShell');
+    const feedUpdateBadgeEl = document.getElementById('feedUpdateBadge');
+    const testUpdateBtnEl = document.getElementById('testUpdateBtn');
+
+    const marketLoaderEl = document.getElementById('marketLoader');
+    const marketLoaderLabelEl = document.getElementById('marketLoaderLabel');
+    const marketGridEl = document.getElementById('marketGrid');
+    const marketShellEl = document.getElementById('marketShell');
+    const marketMetaEl = document.getElementById('marketMeta');
+    const marketTabTrendingEl = document.getElementById('marketTabTrending');
+    const marketTabXstocksEl = document.getElementById('marketTabXstocks');
+    const marketRefreshCountdownEl = document.getElementById('marketRefreshCountdown');
+
+    const marketChartShellEl = document.getElementById('marketChartShell');
+    const marketChartTitleEl = document.getElementById('marketChartTitle');
+    const marketChartSubtitleEl = document.getElementById('marketChartSubtitle');
+    const marketChartStatusEl = document.getElementById('marketChartStatus');
+    const marketChartLoaderEl = document.getElementById('marketChartLoader');
+    const marketChartLoaderLabelEl = document.getElementById('marketChartLoaderLabel');
+    const marketChartContainerEl = document.getElementById('marketChart');
+
+    let map;
+    let clusterGroup;
+    let activeMarker = null;
+    let activeEventKey = null;
+    let allEvents = [];
+    let markersByKey = new Map();
+    let selectedCategory = 'all';
+    let refreshIntervalId = null;
+    let countdownIntervalId = null;
+    let nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
+    let isRefreshing = false;
+    let lastDataSignature = '';
+
+    let activeMarketCategory = 'trending';
+    let trendingCache = [];
+    let xstocksCache = [];
+    let lastTrendingSignature = '';
+    let lastXstocksSignature = '';
+    let marketRefreshIntervalId = null;
+    let marketCountdownIntervalId = null;
+    let marketNextRefreshAt = Date.now() + MARKET_REFRESH_INTERVAL_MS;
+    let marketRefreshing = false;
+
+    let selectedMarketAddress = '';
+    let selectedMarketSymbol = '';
+    let selectedMarketLabel = '';
+    let selectedMarketType = 'trending';
+
+    let marketChart;
+    let marketCandleSeries;
+    let marketResizeObserver;
+    let chartLoading = false;
+
+    function getPriorityCfg(priority) {
+      return PRIORITY_CONFIG[(priority || '').toLowerCase()] || PRIORITY_CONFIG.default;
+    }
+
+    function buildMarkerStyle(priority, active = false) {
+      const cfg = getPriorityCfg(priority);
+      return {
+        radius: active ? cfg.radius + 3 : cfg.radius,
+        fillColor: cfg.color,
+        color: active ? '#ffffff' : cfg.color,
+        weight: active ? 3 : 2,
+        fillOpacity: active ? 1 : 0.88,
+        opacity: 1
+      };
+    }
+
+    function formatDate(str) {
+      if (!str) return '—';
+      const d = new Date(str);
+      if (Number.isNaN(d.getTime())) return '—';
+      return new Intl.DateTimeFormat('fr-FR', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }).format(d);
+    }
+
+    function formatCountdown(ms) {
+      const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function formatCompactUsd(value) {
+      const num = Number(value || 0);
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        notation: 'compact',
+        maximumFractionDigits: 2
+      }).format(num);
+    }
+
+    function formatUsd(value) {
+      const num = Number(value || 0);
+      if (Math.abs(num) >= 1) {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          maximumFractionDigits: 4
+        }).format(num);
+      }
+      return '$' + num.toFixed(6);
+    }
+
+    function formatPct(value) {
+      const num = Number(value || 0);
+      const sign = num > 0 ? '+' : '';
+      return `${sign}${num.toFixed(2)}%`;
+    }
+
+    function pctClass(value) {
+      return Number(value || 0) >= 0 ? 'up' : 'down';
+    }
+
+    function shortAddress(address) {
+      if (!address) return '—';
+      return `${address.slice(0, 6)}…${address.slice(-6)}`;
+    }
+
+    function updateCountdownLabel() {
+      if (!refreshCountdownEl) return;
+      if (isRefreshing) {
+        refreshCountdownEl.textContent = 'Updating…';
+        return;
+      }
+      refreshCountdownEl.textContent = `Update in ${formatCountdown(nextRefreshAt - Date.now())}`;
+    }
+
+    function resetCountdown() {
+      nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
+      updateCountdownLabel();
+    }
+
+    function startCountdown() {
+      if (countdownIntervalId) clearInterval(countdownIntervalId);
+      updateCountdownLabel();
+      countdownIntervalId = setInterval(updateCountdownLabel, 1000);
+    }
+
+    function startAutoRefresh() {
+      if (refreshIntervalId) clearInterval(refreshIntervalId);
+      resetCountdown();
+      startCountdown();
+
+      refreshIntervalId = setInterval(async () => {
+        resetCountdown();
+        await refreshAll(false);
+      }, REFRESH_INTERVAL_MS);
+    }
+
+    function formatShortCountdown(ms) {
+      const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function updateMarketCountdown() {
+      if (!marketRefreshCountdownEl) return;
+
+      if (marketRefreshing) {
+        marketRefreshCountdownEl.textContent = 'Refreshing…';
+        return;
+      }
+
+      marketRefreshCountdownEl.textContent = `Refresh in ${formatShortCountdown(marketNextRefreshAt - Date.now())}`;
+    }
+
+    function resetMarketCountdown() {
+      marketNextRefreshAt = Date.now() + MARKET_REFRESH_INTERVAL_MS;
+      updateMarketCountdown();
+    }
+
+    function startMarketCountdown() {
+      if (marketCountdownIntervalId) clearInterval(marketCountdownIntervalId);
+      updateMarketCountdown();
+      marketCountdownIntervalId = setInterval(updateMarketCountdown, 1000);
+    }
+
+    function startMarketAutoRefresh() {
+      if (marketRefreshIntervalId) clearInterval(marketRefreshIntervalId);
+
+      resetMarketCountdown();
+      startMarketCountdown();
+
+      marketRefreshIntervalId = setInterval(async () => {
+        resetMarketCountdown();
+        await refreshSelectedMarketCategory(true);
+      }, MARKET_REFRESH_INTERVAL_MS);
+    }
+
+    async function refreshSelectedMarketCategory(force = true) {
+      if (marketRefreshing) return;
+
+      marketRefreshing = true;
+      updateMarketCountdown();
+
+      try {
+        if (activeMarketCategory === 'trending') {
+          await loadTrendingTab(force);
+        } else {
+          await loadXstocksTab(force);
+        }
+      } finally {
+        marketRefreshing = false;
+        updateMarketCountdown();
+      }
+    }
+
+    function getEventKey(item) {
+      if (item?.id !== undefined && item?.id !== null) return String(item.id);
+      return `${item?.title || 'event'}__${item?.published_at || 'no-date'}__${item?.location || 'no-location'}`;
+    }
+
+    function buildDataSignature(items) {
+      return items
+        .map(item => [
+          getEventKey(item),
+          item.updated_at || '',
+          item.published_at || '',
+          item.priority || '',
+          item.category || '',
+          item.location || ''
+        ].join('__'))
+        .join('|');
+    }
+
+    function buildMarketSignature(items, type) {
+      if (type === 'trending') {
+        return items.map(item => [
+          getMarketItemAddress(item, type),
+          item.price || item.latestprice || '',
+          item.marketCap || item.latestmarketcap || '',
+          item.liquidity || '',
+          item.volume24h || '',
+          item.trendingScore1h || item.trendingscore1h || ''
+        ].join('__')).join('|');
+      }
+
+      return items.map(item => [
+        getMarketItemAddress(item, type),
+        item.priceUSD || '',
+        item.marketCapUSD || '',
+        item.liquidityUSD || '',
+        item.volume24hUSD || '',
+        item.priceChange24hPercentage || ''
+      ].join('__')).join('|');
+    }
+
+    function dedupeEvents(items) {
+      const seen = new Map();
+
+      items.forEach(item => {
+        const key = getEventKey(item);
+        if (!seen.has(key)) {
+          seen.set(key, item);
+          return;
+        }
+
+        const prev = seen.get(key);
+        const prevTime = new Date(prev.updated_at || prev.published_at || 0).getTime();
+        const currTime = new Date(item.updated_at || item.published_at || 0).getTime();
+
+        if (currTime >= prevTime) seen.set(key, item);
+      });
+
+      return [...seen.values()].sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0));
+    }
+
+    function pulseElement(el, className, removeDelay = 1100) {
+      if (!el) return;
+      el.classList.remove(className);
+      void el.offsetWidth;
+      el.classList.add(className);
+      setTimeout(() => el.classList.remove(className), removeDelay);
+    }
+
+    function showFeedBadge(text = 'updated') {
+      if (!feedUpdateBadgeEl) return;
+      feedUpdateBadgeEl.textContent = text;
+      feedUpdateBadgeEl.classList.add('show');
+      setTimeout(() => feedUpdateBadgeEl.classList.remove('show'), 1800);
+    }
+
+    function activateMarker(marker, item) {
+      if (activeMarker) {
+        activeMarker.setStyle(buildMarkerStyle(activeMarker._priorityKey, false));
+      }
+
+      marker.setStyle(buildMarkerStyle(item.priority, true));
+      marker._priorityKey = item.priority || 'default';
+      activeMarker = marker;
+      activeEventKey = getEventKey(item);
+    }
+
+    function focusEvent(item) {
+      const key = getEventKey(item);
+      const marker = markersByKey.get(key);
+      if (!marker || !map || !clusterGroup) return;
+
+      clusterGroup.zoomToShowLayer(marker, () => {
+        map.setView(marker.getLatLng(), Math.max(map.getZoom(), 5), { animate: true });
+        activateMarker(marker, item);
+        marker.openPopup();
+      });
+    }
+
+    function buildPopupHTML(item) {
+      const cfg = getPriorityCfg(item.priority);
+
+      return `
+        <div style="min-width:210px;max-width:270px;font-family:'JetBrains Mono',monospace">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
+            <span style="width:8px;height:8px;border-radius:50%;background:${cfg.color};display:inline-block"></span>
+            <span style="font-size:10px;font-weight:700;color:${cfg.color};text-transform:uppercase;letter-spacing:.06em">${cfg.label}</span>
+          </div>
+          <div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.92);line-height:1.45;margin-bottom:6px">
+            ${item.title || '—'}
+          </div>
+          <div style="font-size:9px;color:rgba(255,255,255,.55);margin-bottom:3px">📍 ${item.location || '—'}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,.45)">${formatDate(item.published_at)}</div>
+          ${
+            item.url && item.url !== '#'
+              ? `<a href="${item.url}" target="_blank" rel="noopener" style="display:inline-flex;margin-top:8px;font-size:9px;color:#00e5ff;text-decoration:none">Open source ↗</a>`
+              : ''
+          }
+        </div>
+      `;
+    }
+
+    function getClusterDominantPriority(cluster) {
+      const children = cluster.getAllChildMarkers();
+      const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+
+      children.forEach(marker => {
+        const p = (marker._priorityKey || '').toLowerCase();
+        if (counts[p] !== undefined) counts[p]++;
+      });
+
+      let winner = 'low';
+      let maxCount = -1;
+
+      ['critical', 'high', 'medium', 'low'].forEach(key => {
+        const count = counts[key];
+        if (count > maxCount) {
+          winner = key;
+          maxCount = count;
+        } else if (count === maxCount && count > 0) {
+          if (getPriorityCfg(key).rank > getPriorityCfg(winner).rank) winner = key;
+        }
+      });
+
+      return winner;
+    }
+
+    function getClusterRadius(count) {
+      if (count >= 500) return 40;
+      if (count >= 200) return 36;
+      if (count >= 100) return 32;
+      if (count >= 50) return 28;
+      if (count >= 20) return 24;
+      return 20;
+    }
+
+    function createClusterIcon(cluster) {
+      const count = cluster.getChildCount();
+      const dominant = getClusterDominantPriority(cluster);
+      const cfg = getPriorityCfg(dominant);
+      const size = getClusterRadius(count);
+
+      return L.divIcon({
+        html: `
+          <div style="
+            width:${size}px;
+            height:${size}px;
+            border-radius:999px;
+            background:${cfg.color}22;
+            border:2px solid ${cfg.color};
+            box-shadow:0 0 0 4px ${cfg.color}10,0 0 18px ${cfg.color}88,inset 0 0 18px ${cfg.color}22;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:${cfg.color};
+            font-size:${count >= 100 ? 9 : 10}px;
+            font-weight:700;
+            font-family:'JetBrains Mono', monospace;
+            backdrop-filter: blur(3px);
+          ">${count}</div>
+        `,
+        className: '',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2]
+      });
+    }
+
+    async function fetchAllEvents() {
+      let rowsAll = [];
+      let offset = 0;
+      let keepGoing = true;
+
+      while (keepGoing) {
+        const params = new URLSearchParams(BASE_PARAMS);
+        params.set('limit', PAGE_LIMIT);
+        params.set('offset', offset);
+
+        const url = `${BASE_URL}?${params.toString()}&apikey=${encodeURIComponent(SUPABASE_API_KEY)}`;
+
+        const res = await fetch(url, {
+          headers: {
+            apikey: SUPABASE_API_KEY,
+            Authorization: `Bearer ${SUPABASE_API_KEY}`
+          }
+        });
+
+        if (!res.ok) throw new Error(`Supabase HTTP ${res.status}`);
+
+        const rows = await res.json();
+        rowsAll = rowsAll.concat(rows);
+        badgeEl.textContent = `${rowsAll.length}+ events`;
+
+        if (rows.length < PAGE_LIMIT) keepGoing = false;
+        else offset += PAGE_LIMIT;
+      }
+
+      return rowsAll;
+    }
+
+    async function fetchStockDetails(stock) {
+      const url = `${MOBULA_TOKEN_DETAILS_URL}?blockchain=solana&address=${encodeURIComponent(stock.address)}`;
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: MOBULA_API_KEY
+        }
+      });
+
+      if (!res.ok) throw new Error(`Mobula ${stock.symbol} HTTP ${res.status}`);
+
+      const json = await res.json();
+      return { ...stock, ...(json?.data || {}) };
+    }
+
+    async function fetchAllXstocks() {
+      const results = await Promise.allSettled(STOCK_TOKENS.map(fetchStockDetails));
+      return results.map((result, index) => {
+        if (result.status === 'fulfilled') return result.value;
+        return { ...STOCK_TOKENS[index], error: true };
+      });
+    }
+
+    async function fetchTrendingMemes() {
+      const payload = {
+        authorization: MOBULA_API_KEY,
+        assetMode: true,
+        views: [
+          {
+            name: 'search-view',
+            chainId: ['solana:solana'],
+            sortBy: 'trending_score_1h',
+            sortOrder: 'desc',
+            limit: 50,
+            offset: 0,
+            filters: {
+              source: { not: null }
+            }
+          }
+        ]
+      };
+
+      const res = await fetch(MOBULA_PULSE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error(`Pulse HTTP ${res.status}`);
+
+      const json = await res.json();
+
+      if (Array.isArray(json?.['search-view']?.data)) return json['search-view'].data;
+      if (Array.isArray(json?.views?.[0]?.data)) return json.views[0].data;
+      if (Array.isArray(json?.data)) return json.data;
+      if (Array.isArray(json?.results)) return json.results;
+
+      return [];
+    }
+
+    async function fetchMarketHistoryPair(assetAddress) {
+      const params = new URLSearchParams({
+        asset: assetAddress,
+        period: '1min',
+        mode: 'asset',
+        blockchain: 'solana',
+        to: String(Date.now()),
+        amount: '1000'
+      });
+
+      const res = await fetch(`${MOBULA_HISTORY_PAIR_URL}?${params.toString()}`, {
+        headers: {
+          Authorization: MOBULA_API_KEY
+        }
+      });
+
+      if (!res.ok) throw new Error(`History HTTP ${res.status}`);
+
+      const json = await res.json();
+      return Array.isArray(json?.data) ? json.data : [];
+    }
+
+    function populateCategoryTags(items) {
+      const categories = [...new Set(
+        items.map(item => item.category).filter(Boolean).sort((a, b) => a.localeCompare(b))
+      )];
+
+      const previousScroll = document.getElementById('kolCategoryTagsWrap')?.scrollLeft || 0;
+      kolCategoryTagsEl.innerHTML = '';
+
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.dataset.category = 'all';
+      allBtn.className = `feed-tag ${selectedCategory === 'all' ? 'active' : ''}`;
+      allBtn.textContent = 'Toutes';
+      allBtn.addEventListener('click', () => {
+        selectedCategory = 'all';
+        updateActiveCategoryTag();
+        applyFeedFilters(new Set());
+      });
+      kolCategoryTagsEl.appendChild(allBtn);
+
+      categories.forEach(category => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.category = category;
+        btn.className = `feed-tag ${selectedCategory === category ? 'active' : ''}`;
+        btn.textContent = category;
+        btn.addEventListener('click', () => {
+          selectedCategory = category;
+          updateActiveCategoryTag();
+          applyFeedFilters(new Set());
+        });
+        kolCategoryTagsEl.appendChild(btn);
+      });
+
+      const wrap = document.getElementById('kolCategoryTagsWrap');
+      if (wrap) wrap.scrollLeft = previousScroll;
+    }
+
+    function updateActiveCategoryTag() {
+      const tags = kolCategoryTagsEl.querySelectorAll('.feed-tag');
+      tags.forEach(tag => tag.classList.toggle('active', tag.dataset.category === selectedCategory));
+    }
+
+    function sortEvents(items, mode) {
+      const sorted = [...items];
+
+      if (mode === 'oldest') {
+        sorted.sort((a, b) => new Date(a.published_at || 0) - new Date(b.published_at || 0));
+      } else if (mode === 'priority_desc') {
+        sorted.sort((a, b) => getPriorityCfg(b.priority).rank - getPriorityCfg(a.priority).rank);
+      } else if (mode === 'priority_asc') {
+        sorted.sort((a, b) => getPriorityCfg(a.priority).rank - getPriorityCfg(b.priority).rank);
+      } else if (mode === 'category_asc') {
+        sorted.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+      } else {
+        sorted.sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0));
+      }
+
+      return sorted;
+    }
+
+    function renderFeedCard(item, isNew = false) {
+      const cfg = getPriorityCfg(item.priority);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'w-full text-left rounded-lg border border-white/8 bg-white/[0.02] p-2.5 hover:border-cyan/35 hover:bg-cyan/5 transition';
+      if (isNew) button.classList.add('event-enter');
+
+      button.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span class="inline-block w-2 h-2 rounded-full" style="background:${cfg.color}; box-shadow:0 0 10px ${cfg.color};"></span>
+              <span class="inline-block text-[9px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded border border-white/8 text-white/70 bg-black/25">
+                ${item.category || 'Unknown'}
+              </span>
+              <span class="text-[9px] font-semibold" style="color:${cfg.color}">
+                ${(item.priority || 'info').toUpperCase()}
+              </span>
+            </div>
+            <div class="text-white/90 text-[10px] leading-4">${item.title || '—'}</div>
+            <div class="mt-2 flex items-center justify-between gap-2 text-[9px] text-white/45">
+              <span class="truncate">${item.location || '—'}</span>
+              <span class="shrink-0">${formatDate(item.published_at)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      button.addEventListener('click', () => focusEvent(item));
+      return button;
+    }
+
+    function renderEventsFeed(items, newKeys = new Set()) {
+      kolFeedListEl.innerHTML = '';
+
+      if (!items.length) {
+        kolFeedCountEl.textContent = '0 events';
+        kolFeedListEl.innerHTML = `
+          <div class="rounded-lg border border-white/8 bg-white/[0.02] p-3 text-[10px] text-white/45">
+            Aucun event pour ce filtre.
+          </div>
+        `;
+        return;
+      }
+
+      kolFeedCountEl.textContent = `${items.length} events`;
+
+      items.forEach(item => {
+        const key = getEventKey(item);
+        kolFeedListEl.appendChild(renderFeedCard(item, newKeys.has(key)));
+      });
+    }
+
+    function applyFeedFilters(newKeys = new Set()) {
+      const sortMode = kolSortFilterEl.value;
+      let filtered = [...allEvents];
+
+      if (selectedCategory !== 'all') {
+        filtered = filtered.filter(item => item.category === selectedCategory);
+      }
+
+      filtered = sortEvents(filtered, sortMode);
+      renderEventsFeed(filtered, newKeys);
+    }
+
+    function renderMarkers(items, options = {}) {
+      const { fitBounds = false, newKeys = new Set() } = options;
+      const previousActiveKey = activeEventKey;
+
+      clusterGroup.clearLayers();
+      markersByKey.clear();
+
+      const valid = items.filter(item => {
+        const lat = item.coordinates?.lat;
+        const lng = item.coordinates?.lng;
+        return typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+      });
+
+      badgeEl.textContent = `${valid.length} events`;
+
+      valid.forEach((item, idx) => {
+        const key = getEventKey(item);
+        const marker = L.circleMarker([item.coordinates.lat, item.coordinates.lng], buildMarkerStyle(item.priority, false));
+
+        marker._priorityKey = item.priority || 'default';
+        marker._eventKey = key;
+
+        marker.bindTooltip(`${(item.priority || 'info').toUpperCase()} • ${item.location || '—'}`, {
+          permanent: false,
+          direction: 'top',
+          className: 'macro-tooltip',
+          offset: [0, -6]
+        });
+
+        marker.bindPopup(buildPopupHTML(item), {
+          className: 'custom-popup',
+          maxWidth: 280,
+          autoPanPadding: [20, 20]
+        });
+
+        marker.on('click', () => activateMarker(marker, item));
+
+        clusterGroup.addLayer(marker);
+        markersByKey.set(key, marker);
+
+        if (newKeys.has(key)) {
+          const boostedStyle = buildMarkerStyle(item.priority, false);
+          marker.setStyle({ ...boostedStyle, radius: boostedStyle.radius + 4, fillOpacity: 1 });
+          setTimeout(() => {
+            if (activeMarker !== marker) marker.setStyle(buildMarkerStyle(item.priority, false));
+          }, 1100);
+        }
+
+        if (!previousActiveKey && idx === 0) {
+          setTimeout(() => activateMarker(marker, item), 300);
+        }
+      });
+
+      if (previousActiveKey && markersByKey.has(previousActiveKey)) {
+        const marker = markersByKey.get(previousActiveKey);
+        const item = valid.find(v => getEventKey(v) === previousActiveKey);
+        if (marker && item) activateMarker(marker, item);
+      }
+
+      if (fitBounds) {
+        if (valid.length > 1) {
+          const bounds = valid.map(item => [item.coordinates.lat, item.coordinates.lng]);
+          map.fitBounds(bounds, { padding: [30, 30], maxZoom: 5 });
+        } else if (valid.length === 1) {
+          map.setView([valid[0].coordinates.lat, valid[0].coordinates.lng], 4);
+        }
+      }
+    }
+
+    function getMarketItemsByType(type) {
+      return type === 'trending' ? trendingCache : xstocksCache;
+    }
+
+    function getMarketItemAddress(item, type) {
+      if (!item) return '';
+      if (type === 'trending') return item.address || item.token?.address || '';
+      return item.address || '';
+    }
+
+    function getMarketItemSymbol(item, type) {
+      if (!item) return '—';
+      if (type === 'trending') return item.symbol || item.token?.symbol || '—';
+      return item.symbol || '—';
+    }
+
+    function getMarketItemLabel(item, type) {
+      if (!item) return '—';
+      if (type === 'trending') return item.name || item.symbol || item.token?.name || item.token?.symbol || 'Unknown';
+      return item.label || item.name || item.symbol || 'Unknown';
+    }
+
+    function findMarketItemByAddress(items, address, type) {
+      return items.find(item => getMarketItemAddress(item, type) === address);
+    }
+
+    function setActiveMarketTab(tab) {
+      activeMarketCategory = tab;
+      marketTabTrendingEl.classList.toggle('active', tab === 'trending');
+      marketTabXstocksEl.classList.toggle('active', tab === 'xstocks');
+      marketChartTitleEl.textContent = tab === 'trending' ? 'Meme Trending' : 'xStock';
+    }
+
+    function initMarketChart() {
+      if (marketChart) return;
+
+      marketChart = LightweightCharts.createChart(marketChartContainerEl, {
+        width: marketChartContainerEl.clientWidth,
+        height: marketChartContainerEl.clientHeight,
+        layout: {
+          background: { color: '#05080d' },
+          textColor: 'rgba(255,255,255,.65)',
+          attributionLogo: false
+        },
+        grid: {
+          vertLines: { color: 'rgba(255,255,255,.05)' },
+          horzLines: { color: 'rgba(255,255,255,.05)' }
+        },
+        rightPriceScale: {
+          borderColor: 'rgba(255,255,255,.08)'
+        },
+        timeScale: {
+          borderColor: 'rgba(255,255,255,.08)',
+          timeVisible: true,
+          secondsVisible: false
+        },
+        crosshair: {
+          vertLine: { color: 'rgba(29,233,255,.22)', labelBackgroundColor: '#0a0f14' },
+          horzLine: { color: 'rgba(29,233,255,.22)', labelBackgroundColor: '#0a0f14' }
+        },
+        localization: {
+          locale: 'en-US'
+        }
+      });
+
+      marketCandleSeries = marketChart.addSeries(LightweightCharts.CandlestickSeries, {
+        upColor: '#12f7a1',
+        downColor: '#ff5e66',
+        borderVisible: false,
+        wickUpColor: '#12f7a1',
+        wickDownColor: '#ff5e66',
+        priceLineVisible: true,
+        lastValueVisible: true
+      });
+
+      marketResizeObserver = new ResizeObserver(entries => {
+        const rect = entries[0]?.contentRect;
+        if (!rect || !marketChart) return;
+        marketChart.resize(Math.floor(rect.width), Math.floor(rect.height));
+      });
+
+      marketResizeObserver.observe(marketChartContainerEl);
+    }
+
+    function setChartLoading(loading, text = 'LOADING CHART…') {
+      chartLoading = loading;
+      marketChartLoaderLabelEl.textContent = text;
+      marketChartLoaderEl.style.display = loading ? 'flex' : 'none';
+    }
+
+    function setChartEmpty(message = 'No history data') {
+      setChartLoading(true, message);
+    }
+
+    function mapHistoryToCandles(rows) {
+      return rows
+        .map(item => ({
+          time: Math.floor(Number(item.time) / 1000),
+          open: Number(item.open),
+          high: Number(item.high),
+          low: Number(item.low),
+          close: Number(item.close),
+          volume: Number(item.volume || 0)
+        }))
+        .filter(item =>
+          Number.isFinite(item.time) &&
+          Number.isFinite(item.open) &&
+          Number.isFinite(item.high) &&
+          Number.isFinite(item.low) &&
+          Number.isFinite(item.close)
+        )
+        .sort((a, b) => a.time - b.time);
+    }
+
+    function updateChartHeaderFromSelection() {
+      marketChartTitleEl.textContent = activeMarketCategory === 'trending' ? 'Meme Trending' : 'xStock';
+      const label = selectedMarketLabel || 'No asset selected';
+      const symbol = selectedMarketSymbol || '—';
+      const address = selectedMarketAddress ? shortAddress(selectedMarketAddress) : '—';
+      marketChartSubtitleEl.textContent = `${label} • ${symbol} • ${address}`;
+    }
+
+    async function loadSelectedMarketChart() {
+      if (!selectedMarketAddress) {
+        marketChartStatusEl.textContent = '1m • 1000 candles';
+        setChartEmpty('NO ASSET SELECTED');
+        return;
+      }
+
+      initMarketChart();
+      updateChartHeaderFromSelection();
+      setChartLoading(true, `LOADING ${selectedMarketSymbol || 'CHART'}…`);
+
+      try {
+        const history = await fetchMarketHistoryPair(selectedMarketAddress);
+        const candles = mapHistoryToCandles(history);
+
+        if (!candles.length) {
+          marketCandleSeries.setData([]);
+          marketChartStatusEl.textContent = '1m • 0 candles';
+          setChartEmpty('NO HISTORY DATA');
+          return;
+        }
+
+        marketCandleSeries.setData(candles);
+        marketChart.timeScale().fitContent();
+
+        const last = candles[candles.length - 1];
+        const first = candles[0];
+        const changePct = first?.close ? ((last.close - first.close) / first.close) * 100 : 0;
+
+        marketChartStatusEl.textContent = `1m • ${candles.length} candles • ${formatPct(changePct)}`;
+        setChartLoading(false);
+        pulseElement(marketChartShellEl, 'market-update-flash', 1200);
+      } catch (err) {
+        console.error(err);
+        marketCandleSeries?.setData([]);
+        marketChartStatusEl.textContent = '1m • error';
+        setChartEmpty('CHART LOAD ERROR');
+      }
+    }
+
+    function renderXstockCard(stock) {
+      const address = getMarketItemAddress(stock, 'xstocks');
+      const isActive = selectedMarketType === 'xstocks' && selectedMarketAddress === address;
+
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `compact-card event-enter ${isActive ? 'active' : ''}`;
+
+      if (stock.error) {
+        card.innerHTML = `
+          <div class="compact-head">
+            <div class="compact-left">
+              <div>
+                <div class="compact-title">${stock.label}</div>
+                <div class="compact-subtitle">${stock.symbol}</div>
+              </div>
+            </div>
+            <div class="compact-price">
+              <div class="compact-price-change down">error</div>
+            </div>
+          </div>
+          <div class="compact-address">${shortAddress(stock.address)}</div>
+        `;
+        return card;
+      }
+
+      const change24h = stock.priceChange24hPercentage ?? 0;
+      const change1h = stock.priceChange1hPercentage ?? 0;
+
+      card.innerHTML = `
+        <div class="compact-head">
+          <div class="compact-left">
+            <img class="compact-logo" src="${stock.logo || ''}" alt="${stock.symbol}" onerror="this.style.display='none'">
+            <div class="min-w-0">
+              <div class="compact-title">${stock.label}</div>
+              <div class="compact-subtitle">${stock.symbol}</div>
+            </div>
+          </div>
+          <div class="compact-price">
+            <div class="compact-price-value">${formatUsd(stock.priceUSD)}</div>
+            <div class="compact-price-change ${pctClass(change24h)}">${formatPct(change24h)}</div>
+          </div>
+        </div>
+
+        <div class="compact-grid">
+          <div class="compact-stat"><span>1h</span><span class="${pctClass(change1h)}">${formatPct(change1h)}</span></div>
+          <div class="compact-stat"><span>24h vol</span><span>${formatCompactUsd(stock.volume24hUSD)}</span></div>
+          <div class="compact-stat"><span>Mcap</span><span>${formatCompactUsd(stock.marketCapUSD)}</span></div>
+          <div class="compact-stat"><span>Liq</span><span>${formatCompactUsd(stock.liquidityUSD)}</span></div>
+        </div>
+
+        <div class="compact-address">${shortAddress(address)}</div>
+      `;
+
+      card.addEventListener('click', async () => {
+        selectedMarketType = 'xstocks';
+        selectedMarketAddress = address;
+        selectedMarketSymbol = getMarketItemSymbol(stock, 'xstocks');
+        selectedMarketLabel = getMarketItemLabel(stock, 'xstocks');
+        renderMarketGrid(xstocksCache, 'xstocks', true);
+        await loadSelectedMarketChart();
+      });
+
+      return card;
+    }
+
+    function renderTrendingCard(token) {
+      const address = getMarketItemAddress(token, 'trending');
+      const isActive = selectedMarketType === 'trending' && selectedMarketAddress === address;
+
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `compact-card event-enter ${isActive ? 'active' : ''}`;
+
+      const price = token.price ?? token.priceUSD ?? token.latestprice ?? token.latestPrice ?? 0;
+      const marketCap = token.marketCap ?? token.marketcap ?? token.marketCapUSD ?? token.latestmarketcap ?? token.latestMarketCap ?? 0;
+      const liquidity = token.liquidity ?? token.liquidityUSD ?? 0;
+      const volume24h = token.volume24h ?? token.volume24hUSD ?? 0;
+      const change1h = token.pricechange1h ?? token.priceChange1h ?? token.price_change_1h ?? 0;
+      const change24h = token.pricechange24h ?? token.priceChange24h ?? token.price_change_24h ?? 0;
+      const trend1h = token.trendingScore1h ?? token.trendingscore1h ?? token.trending_score_1h ?? 0;
+      const holders = token.holdersCount ?? token.holderscount ?? 0;
+      const symbol = token.symbol || '—';
+      const name = token.name || symbol;
+      const source = token.source || token.type || '—';
+
+      card.innerHTML = `
+        <div class="compact-head">
+          <div class="compact-left">
+            <img class="compact-logo" src="${token.logo || ''}" alt="${symbol}" onerror="this.style.display='none'">
+            <div class="min-w-0">
+              <div class="compact-title">${name}</div>
+              <div class="compact-subtitle">${symbol} • ${source}</div>
+            </div>
+          </div>
+          <div class="compact-price">
+            <div class="compact-price-value">${formatUsd(price)}</div>
+            <div class="compact-price-change ${pctClass(change24h)}">${formatPct(change24h)}</div>
+          </div>
+        </div>
+
+        <div class="compact-grid">
+          <div class="compact-stat"><span>T1h</span><span>${Number(trend1h || 0).toLocaleString('en-US')}</span></div>
+          <div class="compact-stat"><span>1h</span><span class="${pctClass(change1h)}">${formatPct(change1h)}</span></div>
+          <div class="compact-stat"><span>Mcap</span><span>${formatCompactUsd(marketCap)}</span></div>
+          <div class="compact-stat"><span>Liq</span><span>${formatCompactUsd(liquidity)}</span></div>
+          <div class="compact-stat"><span>24h vol</span><span>${formatCompactUsd(volume24h)}</span></div>
+          <div class="compact-stat"><span>Holders</span><span>${Number(holders || 0).toLocaleString('en-US')}</span></div>
+        </div>
+
+        <div class="compact-address">${shortAddress(address)}</div>
+      `;
+
+      card.addEventListener('click', async () => {
+        selectedMarketType = 'trending';
+        selectedMarketAddress = address;
+        selectedMarketSymbol = getMarketItemSymbol(token, 'trending');
+        selectedMarketLabel = getMarketItemLabel(token, 'trending');
+        renderMarketGrid(trendingCache, 'trending', true);
+        await loadSelectedMarketChart();
+      });
+
+      return card;
+    }
+
+    function renderMarketGrid(items, type, force = false) {
+      const signature = buildMarketSignature(items, type);
+
+      if (!force) {
+        if (type === 'trending' && signature === lastTrendingSignature) return;
+        if (type === 'xstocks' && signature === lastXstocksSignature) return;
+      }
+
+      if (type === 'trending') lastTrendingSignature = signature;
+      else lastXstocksSignature = signature;
+
+      marketGridEl.innerHTML = '';
+
+      if (!items.length) {
+        marketGridEl.innerHTML = `
+          <div class="rounded-lg border border-white/8 bg-white/[0.02] p-3 text-[10px] text-white/45">
+            Aucun résultat.
+          </div>
+        `;
+      } else {
+        items.forEach(item => {
+          marketGridEl.appendChild(type === 'trending' ? renderTrendingCard(item) : renderXstockCard(item));
+        });
+      }
+
+      marketMetaEl.textContent = `${items.length} results`;
+      marketLoaderEl.style.display = 'none';
+      pulseElement(marketShellEl, 'market-update-flash', 1200);
+    }
+
+    async function syncSelectedMarketFromCache(type) {
+      const items = getMarketItemsByType(type);
+
+      if (!items.length) {
+        selectedMarketType = type;
+        selectedMarketAddress = '';
+        selectedMarketLabel = '';
+        selectedMarketSymbol = '';
+        updateChartHeaderFromSelection();
+        setChartEmpty('NO MARKET DATA');
+        return;
+      }
+
+      let item = null;
+
+      if (selectedMarketType === type && selectedMarketAddress) {
+        item = findMarketItemByAddress(items, selectedMarketAddress, type);
+      }
+
+      if (!item) item = items[0];
+
+      selectedMarketType = type;
+      selectedMarketAddress = getMarketItemAddress(item, type);
+      selectedMarketSymbol = getMarketItemSymbol(item, type);
+      selectedMarketLabel = getMarketItemLabel(item, type);
+      updateChartHeaderFromSelection();
+      await loadSelectedMarketChart();
+    }
+
+    async function loadTrendingTab(force = false) {
+      setActiveMarketTab('trending');
+      marketLoaderLabelEl.textContent = 'LOADING MEME TRENDING…';
+
+      if (!trendingCache.length || force) {
+        marketLoaderEl.style.display = 'flex';
+      }
+
+      try {
+        if (!force && trendingCache.length) {
+          await syncSelectedMarketFromCache('trending');
+          renderMarketGrid(trendingCache, 'trending', true);
+          return;
+        }
+
+        const data = await fetchTrendingMemes();
+        trendingCache = data;
+        await syncSelectedMarketFromCache('trending');
+        renderMarketGrid(trendingCache, 'trending', true);
+      } catch (err) {
+        console.error(err);
+        marketLoaderEl.style.display = 'none';
+        marketGridEl.innerHTML = `
+          <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-[10px] text-red-300">
+            Impossible de charger Meme Trending.
+          </div>
+        `;
+        setChartEmpty('TRENDING LOAD ERROR');
+      }
+    }
+
+    async function loadXstocksTab(force = false) {
+      setActiveMarketTab('xstocks');
+      marketLoaderLabelEl.textContent = 'LOADING XSTOCKS…';
+
+      if (!xstocksCache.length || force) {
+        marketLoaderEl.style.display = 'flex';
+      }
+
+      try {
+        if (!force && xstocksCache.length) {
+          await syncSelectedMarketFromCache('xstocks');
+          renderMarketGrid(xstocksCache, 'xstocks', true);
+          return;
+        }
+
+        const data = await fetchAllXstocks();
+        xstocksCache = data;
+        await syncSelectedMarketFromCache('xstocks');
+        renderMarketGrid(xstocksCache, 'xstocks', true);
+      } catch (err) {
+        console.error(err);
+        marketLoaderEl.style.display = 'none';
+        marketGridEl.innerHTML = `
+          <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-[10px] text-red-300">
+            Impossible de charger xStock.
+          </div>
+        `;
+        setChartEmpty('XSTOCK LOAD ERROR');
+      }
+    }
+
+    async function refreshMarketData() {
+      try {
+        await refreshSelectedMarketCategory(true);
+      } catch (err) {
+        console.error('Market refresh error:', err);
+      }
+    }
+
+    function commitIncomingEvents(rawItems, options = {}) {
+      const { isInitial = false, fitBounds = false, badgeText = 'updated' } = options;
+
+      const deduped = dedupeEvents(rawItems);
+      const newSignature = buildDataSignature(deduped);
+      const changed = newSignature !== lastDataSignature;
+
+      const previousKeys = new Set(allEvents.map(getEventKey));
+      const newKeys = new Set(deduped.map(getEventKey).filter(key => !previousKeys.has(key)));
+
+      allEvents = deduped;
+
+      if (isInitial || changed) {
+        lastDataSignature = newSignature;
+        populateCategoryTags(allEvents);
+        renderMarkers(allEvents, { fitBounds, newKeys });
+        applyFeedFilters(newKeys);
+
+        if (!isInitial) {
+          pulseElement(macroMapShellEl, 'map-update-flash', 1200);
+          pulseElement(kolFeedListEl, 'feed-update-flash', 1000);
+          showFeedBadge(newKeys.size > 0 ? `${badgeText} +${newKeys.size}` : badgeText);
+        }
+      }
+
+      if (isInitial) loaderEl.style.display = 'none';
+    }
+
+    async function refreshAll(isInitial = false) {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      updateCountdownLabel();
+
+      try {
+        const events = await fetchAllEvents();
+        commitIncomingEvents(events, {
+          isInitial,
+          fitBounds: isInitial,
+          badgeText: 'updated'
+        });
+
+        if (isInitial) {
+          await refreshMarketData();
+        }
+      } catch (err) {
+        console.error('Refresh error:', err);
+        showFeedBadge('error');
+
+        if (isInitial) {
+          loaderEl.style.display = 'none';
+          marketLoaderEl.style.display = 'none';
+
+          kolFeedListEl.innerHTML = `
+            <div class="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-[10px] text-red-300">
+              Impossible de charger les events.
+            </div>
+          `;
+        }
+      } finally {
+        isRefreshing = false;
+        updateCountdownLabel();
+      }
+    }
+
+    function pickRandom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function createFakeEvent(index = 0) {
+      const categories = ['Sanctions', 'Conflict', 'Diplomacy', 'Election', 'Energy', 'Cyber'];
+      const priorities = ['critical', 'high', 'medium', 'low'];
+      const locations = [
+        { name: 'Paris, France', lat: 48.8566, lng: 2.3522 },
+        { name: 'Tokyo, Japan', lat: 35.6762, lng: 139.6503 },
+        { name: 'Dubai, UAE', lat: 25.2048, lng: 55.2708 },
+        { name: 'Washington, USA', lat: 38.9072, lng: -77.0369 },
+        { name: 'Singapore', lat: 1.3521, lng: 103.8198 },
+        { name: 'Berlin, Germany', lat: 52.52, lng: 13.405 }
+      ];
+      const verbs = ['rises', 'expands', 'shifts', 'tightens', 'alerts', 'reacts'];
+      const nouns = ['market tension', 'security posture', 'macro narrative', 'regional risk', 'policy pressure', 'supply concerns'];
+
+      const place = pickRandom(locations);
+      const priority = pickRandom(priorities);
+      const category = pickRandom(categories);
+      const now = new Date(Date.now() + index * 1000).toISOString();
+      const fakeId = `fake_${Date.now()}_${index}_${Math.floor(Math.random() * 100000)}`;
+
+      return {
+        id: fakeId,
+        title: `[TEST] ${category} ${pickRandom(verbs)} as ${pickRandom(nouns)}`,
+        category,
+        priority,
+        location: place.name,
+        coordinates: { lat: place.lat, lng: place.lng },
+        published_at: now,
+        updated_at: now,
+        source_type: 'test_feed',
+        url: '#',
+        metadata: { source: 'FakeData Simulator' }
+      };
+    }
+
+    function generateFakeEvents() {
+      const count = Math.random() < 0.5 ? 1 : 2;
+      return Array.from({ length: count }, (_, index) => createFakeEvent(index));
+    }
+
+    function runFakeUpdate() {
+      if (isRefreshing) return;
+
+      isRefreshing = true;
+      updateCountdownLabel();
+      testUpdateBtnEl.disabled = true;
+
+      setTimeout(() => {
+        const fakeEvents = generateFakeEvents();
+        const merged = [...fakeEvents, ...allEvents];
+
+        commitIncomingEvents(merged, {
+          isInitial: false,
+          fitBounds: false,
+          badgeText: 'test'
+        });
+
+        isRefreshing = false;
+        testUpdateBtnEl.disabled = false;
+        updateCountdownLabel();
+      }, 700);
+    }
+
+    function initMarketTabs() {
+      marketTabTrendingEl.addEventListener('click', async () => {
+        await loadTrendingTab(false);
+        resetMarketCountdown();
+      });
+
+      marketTabXstocksEl.addEventListener('click', async () => {
+        await loadXstocksTab(false);
+        resetMarketCountdown();
+      });
+    }
+
+    function initMap() {
+      initMarketChart();
+      updateChartHeaderFromSelection();
+      setChartEmpty('WAITING DATA');
+
+      map = L.map('macroLeafletMap', {
+        zoomControl: true,
+        worldCopyJump: true,
+        minZoom: 2,
+        maxZoom: 10,
+        attributionControl: false
+      }).setView([25, 15], 2);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      }).addTo(map);
+
+      L.control.attribution({ position: 'bottomright', prefix: '' })
+        .addAttribution('© <a href="https://www.openstreetmap.org/copyright" style="color:rgba(255,255,255,.35)">OpenStreetMap</a> © <span style="color:rgba(255,255,255,.35)">CARTO</span>')
+        .addTo(map);
+
+      clusterGroup = L.markerClusterGroup({
+        maxClusterRadius: 40,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 8,
+        iconCreateFunction: createClusterIcon
+      });
+
+      map.addLayer(clusterGroup);
+
+      kolSortFilterEl.addEventListener('change', () => applyFeedFilters(new Set()));
+      initMarketTabs();
+
+      setTimeout(async () => {
+        map.invalidateSize();
+        await refreshAll(true);
+        await loadTrendingTab(true);
+        startAutoRefresh();
+        startMarketAutoRefresh();
+      }, 120);
+    }
+
+    window.addEventListener('load', initMap);
+    window.addEventListener('resize', () => {
+      if (map) map.invalidateSize();
+      if (marketChart) {
+        marketChart.resize(marketChartContainerEl.clientWidth, marketChartContainerEl.clientHeight);
+      }
+    });
+  </script>
+</body>
+</html>
